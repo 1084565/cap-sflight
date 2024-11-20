@@ -1,0 +1,31 @@
+{
+  "name": "travel-analytics",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SFlight ALP",
+  "main": "webapp/index.html",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "ui5 build preload --clean-dest --include-task=generateCachebusterInfo",
+    "start": "ui5 serve",
+    "test": "npm run test:node && npm run test:java",
+    "test:java": "karma start --server=java --single-run",
+    "test:node": "karma start --server=node --single-run"
+  },
+  "keywords": [
+    "ui5",
+    "openui5",
+    "sapui5"
+  ],
+  "devDependencies": {
+    "@ui5/cli": "^4.0.0",
+    "karma": "^6.4.3",
+    "karma-chrome-launcher": "^3.2.0",
+    "karma-ui5": "^4.0.1",
+    "puppeteer": "^23.0.2",
+    "ui5-middleware-simpleproxy": "^3.2.16",
+    "ui5-task-zipper": "^3.1.4"
+  }
+}

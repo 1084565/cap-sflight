@@ -3,7 +3,7 @@ const { GET, POST, PATCH, axios, expect } = cds.test(__dirname+'/..')
 const EDIT = (url) => POST (url+'/TravelService.draftEdit',{})
 const SAVE = (url) => POST (url+'/TravelService.draftActivate')
 axios.defaults.headers['content-type'] = 'application/json;IEEE754Compatible=true' // REVISIT: can be removed when @sap/cds 5.1.5 is released?
-
+axios.defaults.auth = { username: 'alice', password: 'admin' }
 
 describe ("Basic Querying", () => {
 
@@ -46,9 +46,10 @@ describe('Basic OData', () => {
     const { headers, status, data } = await GET `/processor/$metadata`
     expect(status).to.equal(200)
     expect(headers).to.contain({
-      'content-type': 'application/xml',
+      // 'content-type': 'application/xml', //> fails with 'application/xml;charset=utf-8', which is set by express
       'odata-version': '4.0',
     })
+    expect(headers['content-type']).to.match(/application\/xml/)
     expect(data).to.contain('<EntitySet Name="Travel" EntityType="TravelService.Travel">')
     expect(data).to.contain('<Annotation Term="Common.Label" String="Travel"/>')
   })
@@ -56,17 +57,17 @@ describe('Basic OData', () => {
   it('GET /processor/Travel', async () => {
     const { data } = await GET(`/processor/Travel?$filter=TravelUUID eq '00667221A8E4645C17002DF03754AB66'`)
     expect(data.value).to.containSubset([{
-      BeginDate: '2021-11-04',
+      BeginDate: '2023-08-02',
       BookingFee: 60,
-      createdAt: '2021-10-17T18:42:07.000Z',
+      createdAt: expectedValue => /2023-07-16T18:42:07\.000(0000)?Z/.test(expectedValue), // timestamp precision increase with cds^7
       createdBy: 'Hansmann',
       CurrencyCode_code: 'SGD',
       Description: 'Sightseeing in Singapore',
-      EndDate: '2022-08-31',
+      EndDate: '2024-05-29',
       HasActiveEntity: false,
       HasDraftEntity: false,
       IsActiveEntity: true,
-      LastChangedAt: '2021-10-28T03:18:18.000Z',
+      LastChangedAt: expectedValue => /2023-07-27T03:18:18\.000(0000)?Z/.test(expectedValue), // timestamp precision increase with cds^7
       LastChangedBy: 'Deichgraeber',
       to_Agency_AgencyID: '070029',
       to_Customer_CustomerID: '000318',
@@ -106,9 +107,9 @@ describe('Basic OData', () => {
   it('supports $top/$skip paging', async () => {
     const { data: p1 } = await GET `/processor/Travel?$select=TravelID,Description&$top=3&$orderby=TravelID`
     expect(p1.value).to.containSubset([
-      {"Description": "Business Trip for Christine, Pierre", "IsActiveEntity": true, "TravelID": 1},
-      {"Description": "Vacation", "IsActiveEntity": true, "TravelID": 2},
-      {"Description": "Vacation", "IsActiveEntity": true, "TravelID": 3},
+      {"Description": "Business Trip for Christine, Pierre", "TravelID": 1},
+      {"Description": "Vacation", "TravelID": 2},
+      {"Description": "Vacation", "TravelID": 3},
     ])
     const { data: p2 } = await GET `/processor/Travel?$select=Description&$skip=3&$orderby=TravelID`
     expect(p2.value).not.to.containSubset([

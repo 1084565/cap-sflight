@@ -14,61 +14,61 @@ In some cases, the model and the handlers can be improved or simplified once fur
 In other cases, the app itself could be improved. For example, calculation of the total price for a travel
 currently simply sums up the single prices ignoring the currencies.
 
+> For enabling all features of the Analytical List Page (ALP) in the Node.js runtime, we have switched on the new OData parser 
+(`odata_new_parser: true` in `package.json`), which is still in an **experimental state**.
+Early adopters may use this feature in own projects on their own risk.
+You can also use the ALP with the standard OData parser, but then some features like grouping in the table are not available.
+
 ![](https://github.com/SAP-samples/cap-sflight/workflows/CI/badge.svg)
 [![REUSE status](https://api.reuse.software/badge/github.com/SAP-samples/cap-sflight)](https://api.reuse.software/info/github.com/SAP-samples/cap-sflight)
 
 
-## SAP Fiori UI with Node.js Backend
+## Run locally
 
-### Build and Run
+### Build and Run - Node.js Backend
 
-In the root folder of your project run
+In the root folder of your project, run
 ```
 npm ci
-cds watch
+cd watch
 ```
 
-### Accessing the SAP Fiori App
+#### Typescript
 
-Open this link in your browser:
-http://localhost:4004/travel_processor/webapp/index.html
+There also is a typescript variant of the Node.js custom handlers.
 
-### Integration Tests
+Prerequisite:
+```
+npm i -g @sap/cds-dk typescript tsx
+```
 
-To start OPA tests, open this link in your browser:
-http://localhost:4004/travel_processor/webapp/test/integration/Opa.qunit.html
+In the root folder of your project, run
+```
+npm ci
+npx cds-typer "*"
+cds-tsx watch
+```
 
-Test documentation is available at:
-https://ui5.sap.com/#/api/sap.fe.test
+### Build and Run - Java Backend
 
-## SAP Fiori UI with Java Backend
-
-### Build and Run
-
-In the root folder of your project run
+In the root folder of your project, run
 ```
 npm ci
 mvn spring-boot:run
 ```
 
-To start the middleware, in another console execute
-```
-cd app\travel_processor
-npm start
-```
+### Accessing the SAP Fiori Apps
 
-### Accessing the SAP Fiori App
+Open these links in your browser:
+* http://localhost:4004/travel_processor/webapp/index.html for processing the travel data
+* http://localhost:4004/travel_analytics/webapp/index.html for the [Analytical List Page](https://ui5.sap.com/#/topic/3d33684b08ca4490b26a844b6ce19b83) (ALP)
 
-Open this link in your browser:
-http://localhost:8080/index.html
-
-Note: If you access the CAP Java server directly without middleware, you will have to enter mock user credentials admin / admin which are maintained in file application.yml.
-
+Log in with user `amy` and empty password.
 
 ### Integration Tests
 
 To start OPA tests, open this link in your browser:
-http://localhost:8080/test/integration/Opa.qunit.html
+http://localhost:4004/travel_processor/webapp/test/integration/Opa.qunit.html
 
 Test documentation is available at:
 https://ui5.sap.com/#/api/sap.fe.test
@@ -122,6 +122,10 @@ The build results will be stored in the directory `mta_archives`.
 Any authorized user has read access to the app. For further authorization, assign a role collection to your user in the SAP BTP Cockpit:
 * `sflight-reviewer-{spacename}` for executing actions *Accept Travel*, *Reject Travel*, and *Deduct Discount*
 * `sflight-processor-{spacename}` for full write access
+
+### Integrate SFlight with SAP Build Workzone, Standard Edition
+
+CAP SFlight uses the managed AppRouter, which in case of a trial account, is provided by the Launchpad Service in SAP Build Workzone, Standard Edition. Please consult [this tutorial](https://developers.sap.com/tutorials/integrate-with-work-zone.html) to make sure that your Launchpad Service is configured correctly to serve the CAP SFlight Frontend.
 
 ### Local Development with a HANA Cloud Instance
 

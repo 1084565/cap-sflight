@@ -13,8 +13,8 @@ import com.sap.cds.services.handler.annotations.On;
 import com.sap.cds.services.handler.annotations.ServiceName;
 import com.sap.cds.services.persistence.PersistenceService;
 
-import cds.gen.travelservice.AcceptTravelContext;
-import cds.gen.travelservice.RejectTravelContext;
+import cds.gen.travelservice.TravelAcceptTravelContext;
+import cds.gen.travelservice.TravelRejectTravelContext;
 import cds.gen.travelservice.Travel;
 import cds.gen.travelservice.TravelService_;
 import cds.gen.travelservice.Travel_;
@@ -36,30 +36,30 @@ public class AcceptRejectHandler implements EventHandler {
 	}
 
 	@Before(entity = Travel_.CDS_NAME)
-	public void beforeAcceptTravel(final AcceptTravelContext context) {
+	public void beforeAcceptTravel(final TravelAcceptTravelContext context) {
 
-		draftService.run(context.getCqn()).first(Travel.class).ifPresent(this::checkIfTravelHasExceptedStatus);
+		draftService.run(context.cqn()).first(Travel.class).ifPresent(this::checkIfTravelHasExceptedStatus);
 	}
 
 	@Before(entity = Travel_.CDS_NAME)
-	public void beforeRejectTravel(final RejectTravelContext context) {
-		draftService.run(context.getCqn()).first(Travel.class).ifPresent(this::checkIfTravelHasExceptedStatus);
+	public void beforeRejectTravel(final TravelRejectTravelContext context) {
+		draftService.run(context.cqn()).first(Travel.class).ifPresent(this::checkIfTravelHasExceptedStatus);
 	}
 
 	@On(entity = Travel_.CDS_NAME)
-	public void onRejectTravel(final RejectTravelContext context) {
-		Travel travel = draftService.run(context.getCqn()).single(Travel.class);
+	public void onRejectTravel(final TravelRejectTravelContext context) {
+		Travel travel = draftService.run(context.cqn()).single(Travel.class);
 		context.getCdsRuntime().requestContext().privilegedUser().run(ctx -> {
-			updateStatusForTravelId(travel.getTravelUUID(), TRAVEL_STATUS_CANCELLED, travel.getIsActiveEntity());
+			updateStatusForTravelId(travel.travelUUID(), TRAVEL_STATUS_CANCELLED, travel.isActiveEntity());
 		});
 		context.setCompleted();
 	}
 
 	@On(entity = Travel_.CDS_NAME)
-	public void onAcceptTravel(final AcceptTravelContext context) {
-		Travel travel = draftService.run(context.getCqn()).single(Travel.class);
+	public void onAcceptTravel(final TravelAcceptTravelContext context) {
+		Travel travel = draftService.run(context.cqn()).single(Travel.class);
 		context.getCdsRuntime().requestContext().privilegedUser().run(ctx -> {
-			updateStatusForTravelId(travel.getTravelUUID(), TRAVEL_STATUS_ACCEPTED, travel.getIsActiveEntity());
+			updateStatusForTravelId(travel.travelUUID(), TRAVEL_STATUS_ACCEPTED, travel.isActiveEntity());
 		});
 		context.setCompleted();
 	}
@@ -78,10 +78,10 @@ public class AcceptRejectHandler implements EventHandler {
 	}
 
 	private void checkIfTravelHasExceptedStatus(Travel travel) {
-		if (travel.getTravelStatusCode() != null && !travel.getTravelStatusCode()
+		if (travel.travelStatusCode() != null && !travel.travelStatusCode()
 				.equalsIgnoreCase(AcceptRejectHandler.TRAVEL_STATUS_OPEN)) {
-			throw new IllegalTravelStatusException("error.travel.status.unexpected", travel.getTravelID(),
-					AcceptRejectHandler.TRAVEL_STATUS_OPEN, travel.getTravelStatusCode());
+			throw new IllegalTravelStatusException("error.travel.status.unexpected", travel.travelID(),
+					AcceptRejectHandler.TRAVEL_STATUS_OPEN, travel.travelStatusCode());
 		}
 	}
 }

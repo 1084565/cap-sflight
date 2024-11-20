@@ -8,6 +8,7 @@ gen/
 node_modules/
 target/
 .reloadtrigger
+@cds-models/
 
 # Web IDE, App Studio
 .che/
@@ -49,3 +50,9 @@ dist/
 
 # Exclude Helm chart for this example
 /chart
+
+# Experimental
+xxx_*
+xxx/*
+
+@cds-models

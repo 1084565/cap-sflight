@@ -71,7 +71,7 @@
             "css": []
         },
         "dependencies": {
-            "minUI5Version": "1.96.0",
+            "minUI5Version": "1.128.0",
             "libs": {
                 "sap.ui.core": {},
                 "sap.fe.templates": {}
@@ -99,6 +99,10 @@
                     "autoExpandSelect": true,
                     "earlyRequests": true
                 }
+            },
+            "@i18n": {
+                "type": "sap.ui.model.resource.ResourceModel",
+                "uri": "i18n/i18n.properties"
             }
         },
         "routing": {
@@ -133,7 +137,7 @@
                                 }
                             },
                             "variantManagement": "Page",
-                            "initialLoad": true,
+                            "initialLoad": "Enabled",
                             "navigation": {
                                 "Travel": {
                                     "detail": {
@@ -188,7 +192,8 @@
                         }
                     }
                 }
-            }
+            },
+            "config": {}
         },
         "contentDensities": {
             "compact": true,

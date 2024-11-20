@@ -3,20 +3,17 @@ management:
         web:
             exposure:
                 include: "*"
----
-spring:
-    profiles: default
-    web.resources.static-locations: "file:./app"
+
 cds:
+    sql.hana.search:
+        fuzzy: true
+        fuzzinessThreshold: 0.9
     security.mock.users:
     - name: rose
-      password: rose
     - name: martha
-      password: martha
       roles:
         - reviewer
     - name: amy
-      password: amy
       roles:
         - processor
     - name: admin
@@ -28,14 +25,18 @@ cds:
         endpoint:
             path: "/"
 
+---
+spring:
+    config.activate.on-profile: default
+
 server:
     port: 4004
 
 ---
 spring:
-    profiles: cloud
+    config.activate.on-profile: cloud
+    sql.init.mode: never
 
 cds:
-    odata-v4:
-        endpoint:
-            path: "/"
+    datasource:
+        csv.initialization-mode: never
