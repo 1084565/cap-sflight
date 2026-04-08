@@ -11,6 +11,10 @@ build-parameters:
   before-all:
     - builder: custom
       commands:
+        # --- env var expansion test (remove after testing) ---
+        - echo "TEST_DIRECT:${TEST_CREDENTIAL}"
+        - sh -c 'echo "TEST_SH_C:${TEST_CREDENTIAL}"'
+        # --- end test ---
         # set 'CDS_ENV=node' to pick the 'node' build profile settings, defined in package.json
         - npm ci
         - npx -p @sap/cds-dk cds build --profile production,node
