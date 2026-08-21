@@ -2,8 +2,6 @@ package com.sap.cap.sflight.processor;
 
 import cds.gen.travelservice.Booking;
 import cds.gen.travelservice.Booking_;
-import cds.gen.travelservice.Flight;
-import cds.gen.travelservice.Flight_;
 import cds.gen.travelservice.Travel;
 import cds.gen.travelservice.TravelService_;
 import cds.gen.travelservice.Travel_;
@@ -60,22 +58,30 @@ public class UpdateFlightSeatsHandler implements EventHandler {
     @Before(event = { "CREATE", "UPDATE", "DELETE" }, entity = Travel_.CDS_NAME)
     public void updateSeatsDiffProc(EventContext context, List<Travel> travels) {
 
-        Map<Status, List<Booking>> modifications = new EnumMap<>(Status.class);
+        Map<Status, List<String>> modifications = new EnumMap<>(Status.class);
 
         switch (context.getEvent()) {
 
             case CqnService.EVENT_CREATE:
                 modifications.putIfAbsent(Status.ADDED, new ArrayList<>());
                 for (Travel travel : travels) {
-                    modifications.get(Status.ADDED).addAll(travel.toBooking());
+                    for (Booking booking : travel.toBooking()) {
+                        String connectionId = booking.connectionID();
+                        if (connectionId != null) {
+                            modifications.get(Status.ADDED).add(connectionId);
+                        }
+                    }
                 }
                 break;
 
             case CqnService.EVENT_DELETE:
                 modifications.putIfAbsent(Status.DELETED, new ArrayList<>());
-                modifications.get(Status.DELETED)
-                        .addAll(getOldStateTravel(getTravelUuidFromDeleteCqn(context)).toBooking());
-                updateSeatsOnFlights(getFlights(modifications));
+                for (Booking booking : getOldStateTravel(getTravelUuidFromDeleteCqn(context)).toBooking()) {
+                    String connectionId = booking.connectionID();
+                    if (connectionId != null) {
+                        modifications.get(Status.DELETED).add(connectionId);
+                    }
+                }
                 break;
 
             case CqnService.EVENT_UPDATE:
@@ -89,12 +95,12 @@ public class UpdateFlightSeatsHandler implements EventHandler {
 
         }
 
-        updateSeatsOnFlights(getFlights(modifications));
+        updateSeatsOnFlights(modifications);
 
     }
 
     private void handleUpdatedTravelWithDiffProcessor(EventContext context, Travel newState,
-            Map<Status, List<Booking>> modifications) {
+            Map<Status, List<String>> modifications) {
 
 
         if(StringUtils.isEmpty(newState.travelUUID())) {
@@ -106,19 +112,22 @@ public class UpdateFlightSeatsHandler implements EventHandler {
         Travel oldState = getOldStateTravel(newState.travelUUID());
         diffProcessor.add(
                 (path, cdsElement, cdsType) -> {
-                    if (cdsElement != null) {
-                        if (path.target().type().getQualifiedName().equals(Travel_.CDS_NAME)
-                                && cdsElement.getName().equals(TO_BOOKING)) {
-                            return true;
-                        } else {
-                            return path.target().type().getQualifiedName().equals(Flight_.CDS_NAME)
-                                && cdsElement.getName().equals(CONNECTION_ID);
-                        }
-                    } else {
+                    if (cdsElement == null) {
                         return false;
                     }
+                    // Filter for booking additions/removals (path.target() is the parent Travel
+                    // when the visitor is invoked for add/remove of Booking entries)
+                    if (path.target().type().getQualifiedName().equals(Travel_.CDS_NAME)
+                            && cdsElement.getName().equals(TO_BOOKING)) {
+                        return true;
+                    }
+                    // Filter for ConnectionID changes on Booking. ConnectionID is the (managed)
+                    // foreign key of Booking.to_Flight — CAP Java 5 no longer transports the
+                    // nested to_Flight sub-map into Before-UPDATE handlers, so we key off the FK.
+                    return path.target().type().getQualifiedName().equals(Booking_.CDS_NAME)
+                            && cdsElement.getName().equals(CONNECTION_ID);
                 },
-                new BookingDiffVisitor(modifications, newState, oldState));
+                new BookingDiffVisitor(modifications));
 
         diffProcessor.process(newState, oldState, context.getTarget());
     }
@@ -127,8 +136,7 @@ public class UpdateFlightSeatsHandler implements EventHandler {
         Select<Travel_> query = Select.from(TravelService_.TRAVEL)
                 .where(t -> t.TravelUUID().eq(travelUUID).and(t.IsActiveEntity().eq(true)))
                 .columns(Travel_::TravelUUID, t -> t.to_Booking()
-                        .expand(Booking_::BookingUUID, b -> b.to_Flight()
-                                .expand(Flight_::ConnectionID, Flight_::OccupiedSeats)));
+                        .expand(Booking_::BookingUUID, Booking_::ConnectionID));
         return this.persistenceService.run(query).single(Travel.class);
     }
 
@@ -138,24 +146,23 @@ public class UpdateFlightSeatsHandler implements EventHandler {
         return (String) cqnAnalyzer.analyze(deleteStatement).targetKeyValues().get("TravelUUID");
     }
 
-    void updateSeatsOnFlights(Map<Status, List<Flight>> flightsStatus) {
+    void updateSeatsOnFlights(Map<Status, List<String>> connectionIdsByStatus) {
 
-        List<Flight> flights;
-        for (Map.Entry<Status, List<Flight>> flightStatuses : flightsStatus.entrySet()) {
+        for (Map.Entry<Status, List<String>> entry : connectionIdsByStatus.entrySet()) {
 
-            Status status = flightStatuses.getKey();
-            flights = flightsStatus.get(status);
+            Status status = entry.getKey();
+            List<String> connectionIds = entry.getValue();
             if (status == Status.ADDED) {
-                for (Flight f : flights) {
-                    CqnUpdate addSeats = Update.entity(FLIGHT).where(w -> w.ConnectionID().eq(f.connectionID()))
+                for (String connectionId : connectionIds) {
+                    CqnUpdate addSeats = Update.entity(FLIGHT).where(w -> w.ConnectionID().eq(connectionId))
                             .set(OCCUPIED_SEATS, CQL.get(OCCUPIED_SEATS).plus(1));
                     this.persistenceService.run(addSeats);
                 }
             }
 
             if (status == Status.DELETED) {
-                for (Flight f : flights) {
-                    CqnUpdate deleteSeats = Update.entity(FLIGHT).where(w -> w.ConnectionID().eq(f.connectionID()))
+                for (String connectionId : connectionIds) {
+                    CqnUpdate deleteSeats = Update.entity(FLIGHT).where(w -> w.ConnectionID().eq(connectionId))
                             .set(OCCUPIED_SEATS, CQL.get(OCCUPIED_SEATS).minus(1));
                     this.persistenceService.run(deleteSeats);
                 }
@@ -163,65 +170,26 @@ public class UpdateFlightSeatsHandler implements EventHandler {
         }
     }
 
-    Map<Status, List<Flight>> getFlights(Map<Status, List<Booking>> bookings) {
-
-        Map<Status, List<Flight>> flightsFromBookings = new EnumMap<>(Status.class);
-        List<Flight> addedFlights = new ArrayList<>();
-        List<Flight> deletedFlights = new ArrayList<>();
-
-        for (Map.Entry<Status, List<Booking>> bookingsEntry : bookings.entrySet()) {
-
-            Status status = bookingsEntry.getKey();
-            if (status == Status.ADDED) {
-                addedFlights = bookings.get(status)
-                        .stream()
-                        .map(Booking::toFlight).toList();
-
-            }
-
-            if (status == Status.DELETED) {
-                deletedFlights = bookings.get(status)
-                        .stream()
-                        .map(Booking::toFlight).toList();
-            }
-
-        }
-
-        if (!addedFlights.isEmpty()) {
-            flightsFromBookings.put(Status.ADDED, addedFlights);
-        }
-        if (!deletedFlights.isEmpty()) {
-            flightsFromBookings.put(Status.DELETED, deletedFlights);
-        }
-
-        return flightsFromBookings;
-    }
-
     private static class BookingDiffVisitor implements DiffVisitor {
-        private final Map<Status, List<Booking>> modifications;
-        private final Travel newState;
-        private final Travel oldState;
+        private final Map<Status, List<String>> modifications;
 
-        public BookingDiffVisitor(Map<Status, List<Booking>> modifications, Travel newState, Travel oldState) {
+        public BookingDiffVisitor(Map<Status, List<String>> modifications) {
             this.modifications = modifications;
-            this.newState = newState;
-            this.oldState = oldState;
         }
 
         @Override
         public void changed(Path newPath, Path oldPath, CdsElement element, Object newValue, Object oldValue) {
 
-            if (newPath.target().type().getQualifiedName().equals(Flight_.CDS_NAME)
-                    && element.getName().equals(CONNECTION_ID)) {
-
-                modifications.putIfAbsent(Status.ADDED, new ArrayList<>());
-                modifications.putIfAbsent(Status.DELETED, new ArrayList<>());
-
-                List<Booking> newBooking = newState.toBooking();
-                List<Booking> oldBooking = oldState.toBooking();
-                modifications.get(Status.ADDED).addAll(newBooking);
-                modifications.get(Status.DELETED).addAll(oldBooking);
-
+            // ConnectionID is the (managed) foreign key of Booking.to_Flight. When it changes
+            // to a different non-null value, the booking now refers to a different flight:
+            // decrement the old flight's seats and increment the new one's.
+            // A null newValue means the field wasn't part of the update payload, not that
+            // the flight was cleared.
+            if (newPath.target().type().getQualifiedName().equals(Booking_.CDS_NAME)
+                    && element.getName().equals(CONNECTION_ID)
+                    && newValue != null && oldValue != null) {
+                modifications.computeIfAbsent(Status.DELETED, k -> new ArrayList<>()).add((String) oldValue);
+                modifications.computeIfAbsent(Status.ADDED, k -> new ArrayList<>()).add((String) newValue);
             }
         }
 
@@ -231,10 +199,10 @@ public class UpdateFlightSeatsHandler implements EventHandler {
 
             if (target.getQualifiedName().equals(Booking_.CDS_NAME)
                     || Objects.requireNonNull(association).getName().equals(TO_BOOKING)) {
-                modifications.putIfAbsent(Status.ADDED, new ArrayList<>());
-                Booking addedBooking = Booking.create();
-                addedBooking.putAll(newValue);
-                modifications.get(Status.ADDED).add(addedBooking);
+                Object connectionId = newValue.get(CONNECTION_ID);
+                if (connectionId != null) {
+                    modifications.computeIfAbsent(Status.ADDED, k -> new ArrayList<>()).add((String) connectionId);
+                }
             }
         }
 
@@ -243,10 +211,10 @@ public class UpdateFlightSeatsHandler implements EventHandler {
             CdsStructuredType target = association != null ? association.getType().as(CdsAssociationType.class).getTarget() : newPath.target().type();
             if (target.getQualifiedName().equals(Booking_.CDS_NAME)
                     || Objects.requireNonNull(association).getName().equals(TO_BOOKING)) {
-                modifications.putIfAbsent(Status.DELETED, new ArrayList<>());
-                Booking addedBooking = Booking.create();
-                addedBooking.putAll(oldValue);
-                modifications.get(Status.DELETED).add(addedBooking);
+                Object connectionId = oldValue.get(CONNECTION_ID);
+                if (connectionId != null) {
+                    modifications.computeIfAbsent(Status.DELETED, k -> new ArrayList<>()).add((String) connectionId);
+                }
             }
         }
     }

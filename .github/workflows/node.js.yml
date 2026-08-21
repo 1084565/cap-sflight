@@ -6,43 +6,47 @@ name: Node.js CI
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
-    types: [ labeled, opened, synchronize, reopened ]
+    branches: [main]
+    types: [labeled, opened, synchronize, reopened]
   schedule:
     - cron: 20 4 * * *
+
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node-version: [22.x, 20.x]
+        node-version: [24.x, 22.x]
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-    - run: npm i -g @sap/cds-dk typescript tsx
-    - run: npm ci
-    - run: npx cds-typer "*"
-    - run: npm run lint
-    - run: npm run build --if-present
-    - run: npm run test
-    - run: npm run test:mocha
+      - uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm i -g @sap/cds-dk typescript tsx
+      - run: npm ci
+      - run: npx cds-typer "*"
+      - run: npm run lint
+      - run: npm run build --if-present
+      - run: npm run test
+      - run: npm run test:mocha
 
-    - name: Run integration tests - Manage Travels
-      working-directory: ./app/travel_processor
-      run: |
-        npm run test:node -- --ci
+      - name: Run integration tests - Manage Travels
+        working-directory: ./app/travel_processor
+        run: |
+          npm run test:node -- --ci
 
-    - name: Run integration tests - Analyze Bookings
-      working-directory: ./app/travel_analytics
-      run: |
-        npm run test:node -- --ci
+      - name: Run integration tests - Analyze Bookings
+        working-directory: ./app/travel_analytics
+        run: |
+          npm run test:node -- --ci
 
 #
 ### temporarily switch off deployment as it consistently fails

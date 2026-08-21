@@ -6,7 +6,7 @@
   "license": "SAP SAMPLE CODE LICENSE",
   "repository": "https://github.com/SAP-samples/cap-sflight",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "lint": "npx eslint .",
@@ -18,24 +18,24 @@
     "travel-analytics": "cds watch --open sap.fe.cap.travel_analytics/index.html?sap-ui-xx-viewCache=false"
   },
   "dependencies": {
-    "@cap-js/hana": ">=2",
-    "@sap/cds": ">=9.5",
+    "@cap-js/hana": ">=3",
+    "@sap/cds": ">=10",
     "@sap/xssec": "^4",
-    "express": "^4"
+    "express": "^5"
   },
   "devDependencies": {
-    "@cap-js/cds-test": "^0",
-    "@cap-js/cds-typer": "^0.38.0",
-    "@cap-js/cds-types": "^0",
-    "@cap-js/sqlite": ">=2",
-    "@sap/cds-dk" : ">=9.5",
-    "@sap/ux-specification": "UI5-1.139",
+    "@cap-js/cds-test": "^1.0.1",
+    "@cap-js/cds-typer": "^0.40.0",
+    "@cap-js/cds-types": "^0.18.0",
+    "@cap-js/sqlite": ">=3",
+    "@sap/cds-dk": ">=10",
+    "@sap/ux-specification": "UI5-1.144",
     "@types/jest": "^30.0.0",
-    "cds-plugin-ui5": "^0.13.1",
+    "cds-plugin-ui5": "^0.17.0",
     "cross-spawn": "^7.0.3",
-    "eslint": "^9",
+    "eslint": "^9 || ^10",
     "http-proxy": "^1.18.1",
-    "jest": "^30.1.0",
+    "jest": "^30.3.0",
     "qunit": "^2.9.3",
     "ts-jest": "^29.2.5",
     "tsx": "^4.19.2",

@@ -22,7 +22,6 @@ import com.sap.cds.services.persistence.PersistenceService;
 import cds.gen.travelservice.Booking;
 import cds.gen.travelservice.Booking_;
 import cds.gen.travelservice.Flight;
-import cds.gen.travelservice.Flight_;
 import cds.gen.travelservice.Travel;
 import cds.gen.travelservice.TravelService;
 import cds.gen.travelservice.Travel_;
@@ -55,17 +54,14 @@ class UpdateFlightSeatsHandlerServiceIntegrationTest {
         CqnSelect querySelect = Select.from(Travel_.class)
                 .where(t -> t.TravelUUID().eq("72757221A8E4645C17002DF03754AB66"))
                 .columns(Travel_::TravelUUID, t -> t.to_Booking()
-                        .expand(Booking_::BookingUUID, b -> b.to_Flight()
-                                .expand(Flight_::ConnectionID, Flight_::OccupiedSeats)));
+                        .expand(Booking_::BookingUUID, Booking_::ConnectionID));
 
         Travel travel = travelService.run(querySelect).single(Travel.class);
 
         // Compose an updated version of the entity which was retrieved before
         Booking addedBooking = Booking.create();
         addedBooking.bookingUUID("c0adcdc4-47c0-48d9-9787-46a15927c357");
-        Flight flight = Flight.create();
-        flight.connectionID("0001");
-        addedBooking.toFlight(flight);
+        addedBooking.connectionID("0001");
         travel.toBooking().add(addedBooking);
         addRequiredDataToTravel(travel);
 
@@ -85,19 +81,18 @@ class UpdateFlightSeatsHandlerServiceIntegrationTest {
             return; // skip in cloud
         }
 
-        // Query some active entity
+        // Query some active entity, exposing the FK ConnectionID directly on Booking
         CqnSelect querySelect = Select.from(Travel_.class)
                 .where(t -> t.TravelUUID().eq("72757221A8E4645C17002DF03754AB66"))
                 .columns(Travel_::TravelUUID, t -> t.to_Booking()
-                        .expand(Booking_::BookingUUID, b -> b.to_Flight()
-                                .expand(Flight_::ConnectionID, Flight_::OccupiedSeats)));
+                        .expand(Booking_::BookingUUID, Booking_::ConnectionID));
 
         Travel travel = travelService.run(querySelect).single(Travel.class);
 
-        // Compose an updated version of the entity which was retrieved before
-        Flight flightToBeDeleted = travel.toBooking().getFirst().toFlight();
-        String flightID = flightToBeDeleted.connectionID();
-        Integer numberOcSeatsBeforeAdded = flightToBeDeleted.occupiedSeats();
+        // Determine which flight the first booking references so we can verify seats afterwards
+        String flightID = travel.toBooking().getFirst().connectionID();
+        Flight flightBeforeDelete = dbService.run(Select.from(FLIGHT).where(f -> f.ConnectionID().eq(flightID))).first(Flight.class).orElseThrow();
+        Integer numberOcSeatsBeforeAdded = flightBeforeDelete.occupiedSeats();
         Integer expectedNrOcSeats = numberOcSeatsBeforeAdded - 1;
         travel.toBooking().removeFirst();
 
@@ -120,12 +115,11 @@ class UpdateFlightSeatsHandlerServiceIntegrationTest {
             return; // skip in cloud
         }
 
-        // Query some active entity
+        // Query some active entity, exposing the FK ConnectionID directly on Booking
         CqnSelect querySelect = Select.from(Travel_.class)
                 .where(t -> t.TravelUUID().eq("72757221A8E4645C17002DF03754AB66"))
                 .columns(Travel_::TravelUUID, t -> t.to_Booking()
-                        .expand(Booking_::BookingUUID, b -> b.to_Flight()
-                                .expand(Flight_::ConnectionID, Flight_::OccupiedSeats)));
+                        .expand(Booking_::BookingUUID, Booking_::ConnectionID));
 
         Travel travel = travelService.run(querySelect).single(Travel.class);
 
@@ -133,8 +127,8 @@ class UpdateFlightSeatsHandlerServiceIntegrationTest {
         // after update
         List<Booking> bookingActEnt = travel.toBooking();
         Booking bookingToBeUpdated = bookingActEnt.getFirst();
-        Flight flightToBeRemoved = bookingToBeUpdated.toFlight();
-        String flightToBeRemovedID = flightToBeRemoved.connectionID();
+        String flightToBeRemovedID = bookingToBeUpdated.connectionID();
+        Flight flightToBeRemoved = dbService.run(Select.from(FLIGHT).where(f -> f.ConnectionID().eq(flightToBeRemovedID))).first(Flight.class).orElseThrow();
         Integer flightToBeRemovedExpSeats = flightToBeRemoved.occupiedSeats() - 1;
 
         // Get some random flight and get its expected number of seats after update
@@ -144,7 +138,7 @@ class UpdateFlightSeatsHandlerServiceIntegrationTest {
 
         // Compose an updated version of the entity which was retrieved before
         Booking newBooking = travel.toBooking().getFirst();
-        newBooking.toFlight(flightToBeAdded);
+        newBooking.connectionID(flightToBeAddedID);
         travel.toBooking().set(0, newBooking);
         addRequiredDataToTravel(travel);
 
