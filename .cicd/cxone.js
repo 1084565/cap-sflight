@@ -13,7 +13,7 @@ const { execFile } = require('child_process');
 
 // --- Configuration from environment ---
 
-const REQUIRED_VARS = ['CLIENT_ID', 'CX_CLIENT_SECRET', 'CX_PROJECT', 'CX_TENANT', 'CX_URI'];
+const REQUIRED_VARS = ['CLIENT_ID', 'CX_CLIENT_SECRET', 'CX_APPLICATION', 'CX_PROJECT', 'CX_TENANT', 'CX_URI'];
 
 function getEnv() {
   const missing = REQUIRED_VARS.filter(v => !process.env[v]);
@@ -22,9 +22,10 @@ function getEnv() {
     process.exit(1);
   }
   return {
-    clientId:   process.env.CLIENT_ID,
+    clientId:     process.env.CLIENT_ID,
     clientSecret: process.env.CX_CLIENT_SECRET,
-    project:    process.env.CX_PROJECT,
+    application:  process.env.CX_APPLICATION,
+    project:      process.env.CX_PROJECT,
     tenant:     process.env.CX_TENANT,
     baseUri:    process.env.CX_URI,
     authUri:    process.env.CX_AUTH_URI || process.env.CX_URI,
@@ -128,13 +129,14 @@ function runScan(cxBin, env) {
   return new Promise((resolve, reject) => {
     const args = [
       'scan', 'create',
-      '--project-name', env.project,
-      '--file-source',  process.cwd(),
-      '--client-id',    env.clientId,
-      '--base-uri',     env.baseUri,
-      '--base-auth-uri', env.authUri,
-      '--tenant',       env.tenant,
-      '--branch',       env.branch,
+      '--project-name',    env.project,
+      '--application-name', env.application,
+      '--file-source',     process.cwd(),
+      '--client-id',       env.clientId,
+      '--base-uri',        env.baseUri,
+      '--base-auth-uri',   env.authUri,
+      '--tenant',          env.tenant,
+      '--branch',          env.branch,
     ];
 
     if (env.threshold) {
@@ -151,15 +153,8 @@ function runScan(cxBin, env) {
     const child = execFile(cxBin, args, { env: scanEnv, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (stdout) process.stdout.write(stdout);
       if (stderr) process.stderr.write(stderr);
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
+      if (err) reject(err); else resolve();
     });
-
-    child.stdout && child.stdout.on('data', d => process.stdout.write(d));
-    child.stderr && child.stderr.on('data', d => process.stderr.write(d));
   });
 }
 
