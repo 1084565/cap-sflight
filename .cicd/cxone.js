@@ -33,6 +33,7 @@ function getEnv() {
     // Threshold format: "sast-high=0;sast-medium=10;sca-high=0"
     threshold:  process.env.CX_THRESHOLD || '',
     cliVersion: process.env.CX_CLI_VERSION || '2.3.63',
+    scanTypes:  process.env.CX_SCAN_TYPES || '',
   };
 }
 
@@ -123,6 +124,18 @@ async function downloadCli(version, destDir) {
   return cxBin;
 }
 
+async function printScanHelp(cxBin) {
+  return new Promise(resolve => {
+    execFile(cxBin, ['scan', 'create', '--help'], { maxBuffer: 1 * 1024 * 1024 }, (err, stdout, stderr) => {
+      console.log('=== cx scan create --help ===');
+      if (stdout) process.stdout.write(stdout);
+      if (stderr) process.stderr.write(stderr);
+      console.log('=== end help ===');
+      resolve(); // never fail the build on help
+    });
+  });
+}
+
 // --- Scan ---
 
 function runScan(cxBin, env) {
@@ -141,6 +154,10 @@ function runScan(cxBin, env) {
 
     if (env.threshold) {
       args.push('--threshold', env.threshold);
+    }
+
+    if (env.scanTypes) {
+      args.push('--scan-types', env.scanTypes);
     }
 
     // CLIENT_SECRET passed as env var only - never in args (would appear in ps/audit logs)
@@ -172,6 +189,8 @@ async function main() {
     console.error(`CLI download/verification failed: ${err.message}`);
     process.exit(1);
   }
+
+  await printScanHelp(cxBin);
 
   try {
     await runScan(cxBin, env);
